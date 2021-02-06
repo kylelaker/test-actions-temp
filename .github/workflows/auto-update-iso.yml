@@ -1,0 +1,33 @@
+---
+name: Update ISOs
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+env:
+  UBUNTU_RELEASE: focal
+  #MINT_RELEASE: 20.1
+  #MINT_TESTING: testing
+jobs:
+  update-ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies
+        run: |
+          sudo apt-get install -q -y jq
+      - name: Set latest ISO name
+        run: |
+          export MIRROR_URL="https://mirror.cs.jmu.edu/pub/ubuntu-iso/$UBUNTU_RELEASE"
+          export ISO_NAME="$(curl -sL "$MIRROR_URL/SHA256SUMS" | grep desktop | head -n 1 | cut -d'*' -f 2)"
+          jq \
+            --arg iso "$ISO_NAME" \
+            --arg mirror "$MIRROR_URL" \
+            '.variables.iso_file = $iso | .variables.mirror_url = $mirror' packer/ubuntu-build.json > packer/ubuntu-build-update.json
+          mv packer/ubuntu-build-update.json packer/ubuntu-build.json
+      - name: Open a pull request
+        uses: peter-evans/create-pull-request@v3
+        with:
+          commit-message: Update the Ubuntu ISO file
+          title: Update the Ubuntu ISO file
+          body: The latest Desktop ISO in the SHA256SUM
